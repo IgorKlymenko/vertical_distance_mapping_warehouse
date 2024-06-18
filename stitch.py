@@ -8,8 +8,8 @@ import sys
 import argparse
 import imutils
 
-VIDEO_DIR = "C:/Users/kklym/Documents/GitHub/IKK/sample.mp4"
-IMAGE_DIR = "C:/Users/kklym/Documents/GitHub/IKK/frames"
+VIDEO_DIR = "C:/Users/kklym/Documents/GitHub/vertical_distance_mapping_warehouse/sample.mp4"
+IMAGE_DIR = "C:/Users/kklym/Documents/GitHub/vertical_distance_mapping_warehouse/frames"
 
 
 ap = argparse.ArgumentParser()
@@ -90,6 +90,9 @@ def extract_frames(video_path, output_folder, frame_rate, frames_per_pano):
 
     cap.release()
     print(f"Extracted {saved_frame_count} frames to '{output_folder}'")
+
+
+
 
 def img_stitch(img_dir):  
     stitcher = cv2.Stitcher_create()
@@ -210,7 +213,7 @@ def detect_aruco():
                 print("[INFO] ArUco marker ID: {}".format(markerID))
 
             # upload the output image
-            cv2.imwrite(os.path.join(IMAGE_DIR, "stitched_aruco", f"{filename}.jpg"), image)
+            cv2.imwrite(os.path.join(IMAGE_DIR, "stitched_aruco", f"{filename}"), image)
             if image is None:
                 print(f"Skipping {filename} due to stitching error.")
 
@@ -219,3 +222,5 @@ if __name__ == "__main__":
     extract_frames(VIDEO_DIR, IMAGE_DIR, 10, 6)
     set_stitch()
     detect_aruco()
+
+
