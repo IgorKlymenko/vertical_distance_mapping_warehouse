@@ -10,7 +10,7 @@ import argparse
 
 VIDEO_DIR = "C:/Users/kklym/Documents/GitHub/vertical_distance_mapping_warehouse/sample.mp4"
 IMAGE_DIR = "C:/Users/kklym/Documents/GitHub/vertical_distance_mapping_warehouse/frames"
-
+IMG_SCALE = 4900
 
 ap = argparse.ArgumentParser()
 # Remove argparse related code
@@ -65,15 +65,14 @@ def detect_aruco():
 
     # Dictionary to store the first and last detected ArUco markers for each image
     aruco_markers = {}
-    aruco_markers_lt = {}
-    aruco_markers_m = {}
 
     for filename in sorted(os.listdir(stitched_dir)):
         if filename.endswith(".jpg"):
             image_path = os.path.join(stitched_dir, filename)
             print("[INFO] loading image...")
             image = cv2.imread(image_path)
-            image = cv2.resize(image, (4900, int(image.shape[0] * (4900 / image.shape[1]))))  # used sample width based on stitching 5 frames per pano
+
+            image = cv2.resize(image, (IMG_SCALE, int(image.shape[0] * (IMG_SCALE / image.shape[1]))))  # used sample width based on stitching 5 frames per pano
 
             aruco_type = "DICT_4X4_1000"
             if ARUCO_DICT.get(aruco_type, None) is None:
@@ -110,8 +109,6 @@ def detect_aruco():
                     cY = int((topLeft[1] + bottomRight[1]) / 2.0)
                     center = (cX, cY)
 
-                    aruco_markers_lt[markerID] = topLeft
-                    aruco_markers_m[markerID] = center
 
                     # Record the data
                     with open(data_file_path, 'a') as data_file:
@@ -121,83 +118,139 @@ def detect_aruco():
                     cv2.polylines(image, [np.array([topLeft, topRight, bottomRight, bottomLeft], dtype=np.int32)], True, (0, 255, 0), 2)
                     cv2.putText(image, str(markerID), (topLeft[0], topLeft[1] - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-                    # Update dictionary with the first, second, and last detected markers
-                    if aruco_markers.get(filename + "_l") is None:
-                        aruco_markers[filename + "_l"] = markerID
-                    elif aruco_markers.get(filename + "_r") is None:
-                        aruco_markers[filename + "_r"] = markerID
-                    aruco_markers[filename + "_m"] = markerID
+
+
+                    # Crazy binary choice soritng ahah
+                    # 1 el: positioned as right
+                    # 2 el: one is left another right
+                    # 3 el there is a l, m, r
+
+                    if aruco_markers.get(filename + "_r") is None or center[0] > aruco_markers[filename + "_r"][1][0]:
+                        if aruco_markers[filename + "_r"]:
+                            if aruco_markers[filename + "_l"] and center[0] > aruco_markers[filename + "_l"][1][0]:
+                                aruco_markers[filename + "_m"] = [markerID, center]
+                                break
+                            else:
+                                aruco_markers[filename + "_l"] = aruco_markers[filename + "_r"]
+                        aruco_markers[filename + "_r"] = [markerID, center]
+
+
+                    elif aruco_markers.get(filename + "_l") is None or center[0] < aruco_markers[filename + "_l"][1][0]:
+                        if aruco_markers[filename + "_l"]:
+                            if aruco_markers[filename + "_r"] and center[0] < aruco_markers[filename + "_r"][1][0]:
+                                aruco_markers[filename + "_m"] = [markerID, center]
+                                break
+                            else:
+                                aruco_markers[filename + "_r"] = aruco_markers[filename + "_l"]
+                        aruco_markers[filename + "_l"] = [markerID, center]
+
+
+                    else:
+                        aruco_markers[filename + "_m"] = [markerID, center]
+                        break
+
                 # Save the image with detected markers
                 #cv2.imwrite(os.path.join(IMAGE_DIR, "stitched_aruco", f"{filename}"), image)
             else:
                 print(f"No markers detected in {filename}.")
-
-    # Print the dictionary containing the first and last detected markers
-    print(aruco_markers_lt)
-    print(aruco_markers_m)
-
-    return aruco_markers, aruco_markers_lt, aruco_markers_m
+    return aruco_markers
 
 
+def stitch_frames_right_movement(aruco_markers, stitched_dir):
+    sorted_files = sorted(os.listdir(stitched_dir))
 
-def stitch_frames(aruco_markers, aruco_markers_lt, aruco_markers_m):
-    for idx, key in enumerate(sorted(aruco_markers.keys())[:-1]):  # Exclude the last key to avoid index out of range
-        current_key_str = os.path.join(IMAGE_DIR, "stitched_aruco", key[:-2])
-        curr = idx + 1
-        next_key = sorted(aruco_markers.keys())[curr]
+    def get_next_file(current_filename):
+        try:
+            current_index = sorted_files.index(current_filename)
+            if filename.endswith(".jpg"): 
+                return sorted_files[current_index + 1]  # Get the next file in the list
+            else:
+                return None
+        except (ValueError, IndexError):
+            return None
         
-        while aruco_markers[key] != aruco_markers[next_key] and curr < len(aruco_markers.keys()) - 1:
-            curr += 1
-            next_key = sorted(aruco_markers.keys())[curr]
+    for filename in sorted_files:
+        if filename.endswith(".jpg"):
 
-        next_key_str = os.path.join(IMAGE_DIR, "stitched_aruco", next_key[:-2])
+            # Open Image 1
+            image1_path = os.path.join(stitched_dir, filename)
+            print("[INFO] loading image...")
+            image1 = cv2.imread(image1_path)
+            image1 = cv2.resize(image1, (IMG_SCALE, int(image1.shape[0] * (IMG_SCALE / image1.shape[1]))))  # used sample width based on stitching 5 frames per pano
 
-        img1 = cv2.imread(current_key_str)
-        img2 = cv2.imread(next_key_str)
 
-        if img1 is None or img2 is None:
-            continue
+            # Open Image 2
+            filename2 = get_next_file(filename)
+            if filename2 is None:
+                continue
+            image2_path = os.path.join(stitched_dir, filename2)
+            image2 = cv2.imread(image2_path)
+            image2 = cv2.resize(image2, (IMG_SCALE, int(image2.shape[0] * (IMG_SCALE / image2.shape[1]))))  # used sample width based on stitching 5 frames per pano
 
-        # Get ArUco marker coordinates for alignment
-        mid1 = aruco_markers_m.get(aruco_markers[key])
-        mid2 = aruco_markers_m.get(aruco_markers[next_key])
 
-        if None in [mid1, mid2]:
-            continue
+            print(f"{filename} - {filename2}")
+            
+            # Get ArUco marker coordinates for alignment
+            #mid1 = aruco_markers.get(filename + "_r")
+            #mid2 = aruco_markers.get(filename2 + "_l")
 
-        # Calculate translation vectors using centers
-        translation_x = mid2[0] - mid1[0]
-        translation_y = mid2[1] - mid1[1]
 
-        # Create translation matrix
-        translation_matrix = np.float32([[1, 0, translation_x], [0, 1, translation_y]])
-        img1_translated = cv2.warpAffine(img1, translation_matrix, (img1.shape[1], img1.shape[0]))
+            # MATCH tags from 2 consequent images
+            ext = ["_r", "_m", "_l"]
+            found = False
+            for e1 in ext:
+                if not found:
+                    mid1 = aruco_markers.get(filename + e1)   
+                    for e2 in reversed(ext):
+                        mid2 = aruco_markers.get(filename2 + e2)
+                        if mid1 and mid2 and mid1[0] == mid2[0]:
+                            found = True
+                            break
+                            
 
-        # Create a new image large enough to hold both translated img1 and img2
-        new_height = max(img1_translated.shape[0], img2.shape[0])
-        new_width = img1_translated.shape[1] + img2.shape[1] - abs(translation_x)  # Adjust width to overlap on the ArUco tag
-        combined_image = np.zeros((new_height, new_width, 3), dtype=np.float32)
-        
-        # Calculate the alpha blending factor
-        alpha = 0.5
+            # Create a blank canvas
+            height = max(image1.shape[0], image2.shape[0])
+            width = image1.shape[1] + image2.shape[1]
+            canvas = np.zeros((height, width, 3), dtype=np.uint8)
 
-        # Place img1_translated and img2 in the new image with proper overlap
-        overlap_start = img1_translated.shape[1] - abs(int(translation_x))  # Start of overlap
-        combined_image[:img1_translated.shape[0], :overlap_start] = img1_translated[:, :overlap_start] * alpha
-        combined_image[:img2.shape[0], overlap_start:overlap_start + img2.shape[1]] = img2 * alpha
 
-        # Blend overlapping areas
-        combined_image[:img1_translated.shape[0], overlap_start:overlap_start + img2.shape[1]] += img1_translated[:, overlap_start - img2.shape[1]:overlap_start] * alpha
+            move_x = IMG_SCALE - mid1[1][0] + mid2[1][0]
+            move_y = mid1[1][1] - mid2[1][1]  # Assuming mid1 and mid2 contain y-coordinates as well
 
-        # Convert the combined_image back to uint8 type after processing
-        combined_image = combined_image.astype(np.uint8)
-        # Display using matplotlib
-        plt.figure(figsize=(20, 20))
-        plt.imshow(cv2.cvtColor(combined_image, cv2.COLOR_BGR2RGB))
-        plt.title(f"Combined Image: {key} with {next_key}")
-        plt.axis('off')
-        plt.show()
+            canvas_width = image1.shape[1] + image2.shape[1] - abs(move_x)
+            canvas_height = max(image1.shape[0], image2.shape[0]) + abs(move_y)
+            canvas = np.zeros((canvas_height, canvas_width, 3), dtype=np.uint8)
+
+            # Place image1 on the canvas
+            start_y_image1 = max(0, move_y) if move_y < 0 else 0
+            canvas[start_y_image1:start_y_image1 + image1.shape[0], :image1.shape[1]] = image1
+
+            # Calculate the starting x and y coordinates for image2 based on the move
+            start_x_image2 = max(0, image1.shape[1] - abs(move_x))
+            start_y_image2 = max(0, -move_y) if move_y > 0 else 0
+            canvas[start_y_image2:start_y_image2 + image2.shape[0], start_x_image2:start_x_image2 + image2.shape[1]] = image2
+
+            # Blend both images onto the canvas with alpha 0.5 and increase brightness
+            alpha = 0.5
+            beta = 50  # Increase brightness by adding a constant value
+
+            # Blend image1 onto the canvas
+            overlay1 = cv2.addWeighted(canvas[start_y_image1:start_y_image1 + image1.shape[0], :image1.shape[1]], 1 - alpha, image1, alpha, 0)
+            canvas[start_y_image1:start_y_image1 + image1.shape[0], :image1.shape[1]] = cv2.convertScaleAbs(overlay1, alpha=1.0, beta=beta)
+
+            # Blend image2 onto the canvas
+            overlay2 = cv2.addWeighted(canvas[start_y_image2:start_y_image2 + image2.shape[0], start_x_image2:start_x_image2 + image2.shape[1]], 1 - alpha, image2, alpha, 0)
+            canvas[start_y_image2:start_y_image2 + image2.shape[0], start_x_image2:start_x_image2 + image2.shape[1]] = cv2.convertScaleAbs(overlay2, alpha=1.0, beta=beta)
+
+            print(f"{mid1} - {mid2}")
+
+            plt.imshow(canvas)
+            plt.show()
+
+
 
 if __name__ == "__main__":
-    aruco_markers, aruco_markers_lt, aruco_markers_m = detect_aruco()
-    stitch_frames(aruco_markers, aruco_markers_lt, aruco_markers_m)
+    aruco_markers = detect_aruco()
+
+    print(aruco_markers)
+    stitch_frames_right_movement(aruco_markers, os.path.join(IMAGE_DIR, "stitched_aruco"))
