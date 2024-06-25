@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 
+from natsort import natsorted # pip install natsort # sorting purposes
 
 import argparse
 
@@ -21,6 +22,13 @@ ap = argparse.ArgumentParser()
 # 	default="DICT_ARUCO_ORIGINAL",
 # 	help="type of ArUCo tag to detect")
 # args = vars(ap.parse_args())
+
+
+ARUCO_METRIC = {
+    "0": 0.1,   # even tags in cm
+    "1": 0.084,  # odd tags in cm
+    "99": 0.1 #tags from 1 to 9 and tag 931 in cm
+}
 
 
 
@@ -58,15 +66,12 @@ def detect_aruco():
     if not os.path.exists(stitched_dir):
         print(f"Error: Directory {stitched_dir} does not exist.")
         return
-    # Prepare a file to record detected ArUco markers data
-    data_file_path = os.path.join(IMAGE_DIR, "stitched_aruco", "detected_aruco_data.csv")
-    with open(data_file_path, 'w') as data_file:
-        data_file.write("Image,MarkerID,TopLeft,TopRight,BottomRight,BottomLeft,Center\n")
 
     # Dictionary to store the first and last detected ArUco markers for each image
     aruco_markers = {}
+    aruco_width = {}
 
-    for filename in sorted(os.listdir(stitched_dir)):
+    for filename in natsorted(os.listdir(stitched_dir)):
         if filename.endswith(".jpg"):
             image_path = os.path.join(stitched_dir, filename)
             print("[INFO] loading image...")
@@ -83,6 +88,20 @@ def detect_aruco():
             print("[INFO] detecting '{}' tags...".format(aruco_type))
             arucoDict = cv2.aruco.getPredefinedDictionary(ARUCO_DICT[aruco_type])
             arucoParams = cv2.aruco.DetectorParameters()
+
+            
+            # Adjust detection parameters to decrease the detection threshold
+
+            arucoParams.adaptiveThreshWinSizeMin = 4
+
+            arucoParams.adaptiveThreshWinSizeMax = 23
+
+            arucoParams.adaptiveThreshWinSizeStep = 10
+
+            arucoParams.minMarkerPerimeterRate = 0.03
+
+            arucoParams.maxMarkerPerimeterRate = 4.
+
             detector = cv2.aruco.ArucoDetector(arucoDict, arucoParams)
             corners, ids, rejected = detector.detectMarkers(image)
 
@@ -109,10 +128,7 @@ def detect_aruco():
                     cY = int((topLeft[1] + bottomRight[1]) / 2.0)
                     center = (cX, cY)
 
-
-                    # Record the data
-                    with open(data_file_path, 'a') as data_file:
-                        data_file.write(f"{filename},{markerID},{topLeft},{topRight},{bottomRight},{bottomLeft},{center}\n")
+                    aruco_width[filename + "_" + str(markerID)] = abs(int(bottomLeft[0]) - int(bottomRight[0]))
 
                     # Draw the bounding box and ID on the image
                     cv2.polylines(image, [np.array([topLeft, topRight, bottomRight, bottomLeft], dtype=np.int32)], True, (0, 255, 0), 2)
@@ -124,40 +140,38 @@ def detect_aruco():
                     # 1 el: positioned as right
                     # 2 el: one is left another right
                     # 3 el there is a l, m, r
+                    if aruco_markers.get(filename + "_r") is None:
+                       aruco_markers[filename + "_r"] = [markerID, center]
 
-                    if aruco_markers.get(filename + "_r") is None or center[0] > aruco_markers[filename + "_r"][1][0]:
-                        if aruco_markers[filename + "_r"]:
-                            if aruco_markers[filename + "_l"] and center[0] > aruco_markers[filename + "_l"][1][0]:
-                                aruco_markers[filename + "_m"] = [markerID, center]
-                                break
-                            else:
-                                aruco_markers[filename + "_l"] = aruco_markers[filename + "_r"]
+                    elif center[0] > aruco_markers[filename + "_r"][1][0]:
+                        
+                        if aruco_markers[filename + "_l"] and aruco_markers[filename + "_r"][1][0] > aruco_markers[filename + "_l"][1][0]:
+                            aruco_markers[filename + "_m"] = aruco_markers[filename + "_r"]
+                        else:
+                            aruco_markers[filename + "_l"] = aruco_markers[filename + "_r"]
                         aruco_markers[filename + "_r"] = [markerID, center]
 
 
-                    elif aruco_markers.get(filename + "_l") is None or center[0] < aruco_markers[filename + "_l"][1][0]:
-                        if aruco_markers[filename + "_l"]:
-                            if aruco_markers[filename + "_r"] and center[0] < aruco_markers[filename + "_r"][1][0]:
-                                aruco_markers[filename + "_m"] = [markerID, center]
-                                break
-                            else:
+
+                    elif aruco_markers.get(filename + "_l") is None:
+                        aruco_markers[filename + "_l"] = [markerID, center]
+                        
+                    elif center[0] < aruco_markers[filename + "_l"][1][0]:
+
+                        if aruco_markers[filename + "_r"] and aruco_markers[filename + "_l"][1][0] < aruco_markers[filename + "_r"][1][0]:
+                            aruco_markers[filename + "_m"] = aruco_markers[filename + "_l"]
+                        else:
                                 aruco_markers[filename + "_r"] = aruco_markers[filename + "_l"]
                         aruco_markers[filename + "_l"] = [markerID, center]
-
 
                     else:
                         aruco_markers[filename + "_m"] = [markerID, center]
                         break
-
-                # Save the image with detected markers
-                #cv2.imwrite(os.path.join(IMAGE_DIR, "stitched_aruco", f"{filename}"), image)
-            else:
-                print(f"No markers detected in {filename}.")
-    return aruco_markers
+    return aruco_markers, aruco_width
 
 
 def stitch_frames_right_movement(aruco_markers, stitched_dir):
-    sorted_files = sorted(os.listdir(stitched_dir))
+    sorted_files = natsorted(os.listdir(stitched_dir))
 
     def get_next_file(current_filename):
         try:
@@ -197,6 +211,8 @@ def stitch_frames_right_movement(aruco_markers, stitched_dir):
 
             # MATCH tags from 2 consequent images
             ext = ["_r", "_m", "_l"]
+            ext = ["_l", "_m", "_r"]
+
             found = False
             for e1 in ext:
                 if not found:
@@ -209,25 +225,32 @@ def stitch_frames_right_movement(aruco_markers, stitched_dir):
                             
 
             # Create a blank canvas
+
+
             height = max(image1.shape[0], image2.shape[0])
             width = image1.shape[1] + image2.shape[1]
             canvas = np.zeros((height, width, 3), dtype=np.uint8)
 
 
-            move_x = IMG_SCALE - mid1[1][0] + mid2[1][0]
-            move_y = mid1[1][1] - mid2[1][1]  # Assuming mid1 and mid2 contain y-coordinates as well
+            move_x = mid1[1][0] - mid2[1][0]
+            move_y = mid1[1][1] - mid2[1][1]
 
-            canvas_width = image1.shape[1] + image2.shape[1] - abs(move_x)
-            canvas_height = max(image1.shape[0], image2.shape[0]) + abs(move_y)
+
+
+            canvas_width = max(image1.shape[1] + abs(move_x), image2.shape[1] + abs(move_x))
+            canvas_height = max(image1.shape[0] + abs(move_y), image2.shape[0] + abs(move_y))
             canvas = np.zeros((canvas_height, canvas_width, 3), dtype=np.uint8)
+            print(canvas.shape)
 
             # Place image1 on the canvas
-            start_y_image1 = max(0, move_y) if move_y < 0 else 0
-            canvas[start_y_image1:start_y_image1 + image1.shape[0], :image1.shape[1]] = image1
+            start_y_image1 = max(0, -move_y)
+            start_x_image1 = max(0, -move_x)
+
+            canvas[start_y_image1:start_y_image1 + image1.shape[0], start_x_image1:start_x_image1 + image1.shape[1]] = image1
 
             # Calculate the starting x and y coordinates for image2 based on the move
-            start_x_image2 = max(0, image1.shape[1] - abs(move_x))
-            start_y_image2 = max(0, -move_y) if move_y > 0 else 0
+            start_y_image2 = max(0, move_y)
+            start_x_image2 = max(0, move_x)
             canvas[start_y_image2:start_y_image2 + image2.shape[0], start_x_image2:start_x_image2 + image2.shape[1]] = image2
 
             # Blend both images onto the canvas with alpha 0.5 and increase brightness
@@ -244,13 +267,112 @@ def stitch_frames_right_movement(aruco_markers, stitched_dir):
 
             print(f"{mid1} - {mid2}")
 
+            cv2.imwrite(os.path.join(IMAGE_DIR, "stitched_aruco_t", f"{filename}"), canvas)
+
             plt.imshow(canvas)
             plt.show()
 
 
 
-if __name__ == "__main__":
-    aruco_markers = detect_aruco()
+def create_dag(aruco_markers):
+    tags_sequence = []
+    for filename in natsorted(os.listdir(os.path.join(IMAGE_DIR, "stitched_aruco"))):
+        if filename.endswith(".jpg"):
+            if filename + "_l" in aruco_markers and aruco_markers[filename + "_l"][0] not in tags_sequence:
+                tags_sequence.append(aruco_markers[filename + "_l"][0])
+            if filename + "_m" in aruco_markers and aruco_markers[filename + "_m"][0] not in tags_sequence:
+                tags_sequence.append(aruco_markers[filename + "_m"][0])
+            if filename + "_r" in aruco_markers and aruco_markers[filename + "_r"][0] not in tags_sequence:
+                tags_sequence.append(aruco_markers[filename + "_r"][0])
+    print(tags_sequence)
+    return tags_sequence
 
-    print(aruco_markers)
-    stitch_frames_right_movement(aruco_markers, os.path.join(IMAGE_DIR, "stitched_aruco"))
+
+def relative_distance(aruco_markers, aruco_width):
+    rel_dist = {}
+
+    for filename in natsorted(os.listdir(os.path.join(IMAGE_DIR, "stitched_aruco"))):
+        print("[INFO] Processing file:", filename)
+        if filename.endswith(".jpg"):
+            origin = aruco_markers[filename + '_l'][0]
+            if filename + '_m' in aruco_markers:
+                dist1 = transform_into_metric(aruco_markers[filename + '_m'][1][0] - aruco_markers[filename + '_l'][1][0], origin, filename, aruco_width)
+                dist2 = transform_into_metric(aruco_markers[filename + '_r'][1][0] - aruco_markers[filename + '_m'][1][0], origin, filename, aruco_width)
+                rel_dist[f"{aruco_markers[filename + '_l'][0]}-{aruco_markers[filename + '_m'][0]}"] = dist1
+                rel_dist[f"{aruco_markers[filename + '_m'][0]}-{aruco_markers[filename + '_r'][0]}"] = dist2
+            else:
+                dist1 = transform_into_metric(aruco_markers[filename + '_r'][1][0] - aruco_markers[filename + '_l'][1][0], origin, filename, aruco_width)
+                rel_dist[f"{aruco_markers[filename + '_l'][0]}-{aruco_markers[filename + '_r'][0]}"] = dist1
+
+    # Testing Display
+    for key, value in rel_dist.items():
+        print("Relative distance:", key, value)
+
+    return rel_dist
+
+def transform_into_metric(pix_dist, origin_tag, filename, aruco_width):
+    orig_pix = aruco_width.get(filename + "_" + str(origin_tag))
+
+    if origin_tag > 9 or (origin_tag < 930 and origin_tag > 943): # Included Edge Cases
+        key = origin_tag % 2
+    else:
+        key = 99
+
+    orig_metric = ARUCO_METRIC.get(str(key))
+    ratio = orig_metric / orig_pix
+
+    return pix_dist * ratio
+
+
+if __name__ == "__main__":
+    aruco_markers, aruco_width = detect_aruco()
+    #print(aruco_width)
+    dist = relative_distance(aruco_markers, aruco_width)
+
+
+    #testing
+    ave_list = []
+    counter = 0
+    prev = 0
+    for key in dist:
+        counter += 1
+        if counter % 2 == 1:
+            prev = dist.get(key)
+        else:
+            ave_list.append(dist.get(key) + prev)
+
+
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import numpy as np
+
+    # Assuming ave_list is already populated with data
+   # Your data should be here
+
+    # Create the distribution plot
+    plt.figure(figsize=(10, 6))
+    sns.distplot(ave_list, kde=True, hist=True)
+
+    # Customize the plot
+    plt.title('Distribution of Data')
+    plt.xlabel('Value')
+    plt.ylabel('Density')
+
+    # Add grid for better readability
+    plt.grid(True, linestyle='--', alpha=0.7)
+    # If you want to get some basic statistics:
+    print("Basic statistics:")
+    print(f"Mean: {np.mean(ave_list)}")
+    print(f"Median: {np.median(ave_list)}")
+    print(f"Standard Deviation: {np.std(ave_list)}")
+
+    print("-----------------------------------------------------------------")
+    print(f"The MEAN for the in-between pole distances: {sum(ave_list) * 2 / counter} taken from {counter // 2} sois")
+
+    # Show the plot
+    plt.show()
+
+
+    
+    #print(aruco_markers)
+    #stitch_frames_right_movement(aruco_markers, os.path.join(IMAGE_DIR, "stitched_aruco"))

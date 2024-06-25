@@ -3,6 +3,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
+from natsort import natsorted  # sorting purposes
 
 
 import argparse
@@ -53,7 +54,7 @@ ARUCO_DICT = {
 
 def extract_frames(video_path, output_folder, frame_rate, frames_per_pano):
     frames_per_stitch = frame_rate * frames_per_pano   #5 frames per panorama -- empiracally measured
-    all_frames = 600
+    all_frames = 1500
 
     # Ensure the output folder exists
     if not os.path.exists(output_folder):
@@ -99,7 +100,7 @@ def img_stitch(img_dir):
 
     # Extract all frames from the directory
     frames = []
-    for filename in sorted(os.listdir(img_dir)):
+    for filename in natsorted(os.listdir(img_dir)):
         if filename.endswith(".jpg"):
             frame_path = os.path.join(img_dir, filename)
             frame = cv2.imread(frame_path)
@@ -113,6 +114,7 @@ def img_stitch(img_dir):
         print("Error: No frames to stitch.")
         return
 
+    #stitcher.setPanoConfidenceThresh(0.5)  # Set the threshold value as needed
     status, stitched_image = stitcher.stitch(frames)
 
     # Debugging
@@ -130,14 +132,15 @@ def img_stitch(img_dir):
     return stitched_image
 
 def set_stitch():
-    for filename in sorted(os.listdir(IMAGE_DIR)):
+    for filename in natsorted(os.listdir(IMAGE_DIR)):
         stitched_image = img_stitch(os.path.join(IMAGE_DIR, filename))
         
         if not os.path.exists(os.path.join(IMAGE_DIR, "stitched")):
             os.makedirs(os.path.join(IMAGE_DIR, "stitched"))
 
-        cv2.imwrite(os.path.join(IMAGE_DIR, "stitched", f"{filename}.jpg"), stitched_image)
-        if stitched_image is None:
+        if stitched_image is not None:
+            cv2.imwrite(os.path.join(IMAGE_DIR, "stitched", f"{filename}.jpg"), stitched_image)
+        else:
             print(f"Skipping {filename} due to stitching error.")
 
 def detect_aruco():
@@ -150,7 +153,7 @@ def detect_aruco():
         print(f"Error: Directory {stitched_dir} does not exist.")
         return
 
-    for filename in sorted(os.listdir(stitched_dir)):
+    for filename in natsorted(os.listdir(stitched_dir)):
         if filename.endswith(".jpg"):
             image_path = os.path.join(stitched_dir, filename)
             print("[INFO] loading image...")
@@ -174,6 +177,29 @@ def detect_aruco():
         print("[INFO] detecting '{}' tags...".format(args["type"]))
         arucoDict = cv2.aruco.getPredefinedDictionary(ARUCO_DICT[args["type"]])
         arucoParams = cv2.aruco.DetectorParameters()
+
+        arucoParams.adaptiveThreshWinSizeMin = 4
+
+        arucoParams.adaptiveThreshWinSizeMax = 23
+
+        arucoParams.adaptiveThreshWinSizeStep = 10
+
+        arucoParams.minMarkerPerimeterRate = 0.03
+
+        arucoParams.maxMarkerPerimeterRate = 4.0
+
+        # Add these parameters to further refine detection
+        arucoParams.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+        arucoParams.cornerRefinementWinSize = 5
+        arucoParams.cornerRefinementMaxIterations = 30
+        arucoParams.cornerRefinementMinAccuracy = 0.1
+
+        # Adjust thresholding
+        arucoParams.minOtsuStdDev = 5.0
+        arucoParams.perspectiveRemovePixelPerCell = 8
+        arucoParams.perspectiveRemoveIgnoredMarginPerCell = 0.13
+
+
         detector = cv2.aruco.ArucoDetector(arucoDict, arucoParams)
         (corners, ids, rejected) = detector.detectMarkers(image)
         # verify *at least* one ArUco marker was detected
@@ -219,7 +245,7 @@ def detect_aruco():
 
 
 if __name__ == "__main__":
-    extract_frames(VIDEO_DIR, IMAGE_DIR, 10, 6)
+    extract_frames(VIDEO_DIR, IMAGE_DIR, 10, 5)
     set_stitch()
     detect_aruco()
 
