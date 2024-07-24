@@ -22,7 +22,7 @@ Custom image processing pipeline for warehouse distance mapping and object detec
 
 ## Usage
 
-- Put the video for procewsing into `data/raw` folder
+- Put the video for processing into `data/raw` folder
 - Run main script: `python main.py`
 
 ## Structure
