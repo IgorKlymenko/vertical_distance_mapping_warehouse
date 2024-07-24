@@ -36,5 +36,6 @@ Run main script: `python main.py`
 - GPU recommended for processing
 - titching and ArUco detection parameters adjustable for environment
 - Adaptable for various industrial mapping applications
+- All folders will be created automatically on your machine (this repo has folder results which includes one sample of stitched set_10).
   
 Developed for warehouse inventory and layout analysis. Customizable for various industrial applications.
