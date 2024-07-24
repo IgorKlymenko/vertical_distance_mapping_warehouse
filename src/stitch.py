@@ -21,7 +21,7 @@ ap = argparse.ArgumentParser()
 # 	help="type of ArUCo tag to detect")
 # args = vars(ap.parse_args())
 
-CONFIDENCE = 0.2
+CONFIDENCE = 0.1
 
 arucoParams = cv2.aruco.DetectorParameters()
 

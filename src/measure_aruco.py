@@ -58,8 +58,8 @@ ARUCO_DICT = {
 
 
 def detect_aruco(IMAGE_DIR):
-    if not os.path.exists(os.path.join(IMAGE_DIR, "stitched_aruco")):
-        os.makedirs(os.path.join(IMAGE_DIR, "stitched_aruco"))
+    if not os.path.exists(os.path.join(IMAGE_DIR, "rotated")):
+        os.makedirs(os.path.join(IMAGE_DIR, "rotated"))
 
     stitched_dir = os.path.join(IMAGE_DIR, "stitched").replace("\\", "/")
     if not os.path.exists(stitched_dir):
