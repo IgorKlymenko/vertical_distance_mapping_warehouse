@@ -51,7 +51,7 @@ def rotate_yolo(BASE_DIR, IMAGE_DIR):
     predictor = SamPredictor(sam)
 
     # YOLO model settigns for object IDENTIFICATION 
-    YOLOmodel = YOLO(os.path.join(WEIGHTS_DIR, "yolo/best.pt"))
+    YOLOmodel = YOLO(os.path.join(WEIGHTS_DIR, "yolo/vert-stitch-YOLOv9.pt"))
 
     STITCHED_DIR = os.path.join(IMAGE_DIR, "stitched")
     # Dirs - change for yourself
@@ -95,11 +95,7 @@ def rotate_yolo(BASE_DIR, IMAGE_DIR):
             with torch.cuda.amp.autocast():
                 sam_result = mask_generator.generate(image_rgb)
 
-
-            # Make sure to delete variables you no longer need
-
-
-
+            # Delete variables you no longer need
             del sam_result
             torch.cuda.empty_cache()
             """
@@ -213,8 +209,9 @@ def rotate_yolo(BASE_DIR, IMAGE_DIR):
 
                 y_coords_flat = np.concatenate(y_coords)
                 x_coords_flat = np.concatenate(x_coords)
-                """
 
+                # Attempt to do image scaling - works somehow, but does not have any practical use case
+                """
                 if not did_first:
                     min_x = np.min(x_coords_flat)
                     max_x = np.max(x_coords_flat)
@@ -278,6 +275,7 @@ def rotate_yolo(BASE_DIR, IMAGE_DIR):
                 os.mkdir(os.path.join(IMAGE_DIR, "rotated"))
 
             plt.savefig(os.path.join(IMAGE_DIR, "rotated", filename), bbox_inches='tight', pad_inches=0, dpi=300)
-            plt.close()
+
+            plt.close('all')
             print(f"Saved {filename[:-4]} after the segmentation and proper roatation into the directory ../rotated/{filename}")
             #plt.show()

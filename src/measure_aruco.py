@@ -9,8 +9,7 @@ from natsort import natsorted # pip install natsort # sorting purposes
 
 import argparse
 
-#VIDEO_DIR = "C:/Users/kklym/Documents/GitHub/vertical_distance_mapping_warehouse/sample1.mp4"
-IMG_SCALE = 4900
+IMG_SCALE = 4900 # Video Scale of 4900 used for stitched images after the first cycle
 
 ap = argparse.ArgumentParser()
 # Remove argparse related code
@@ -28,9 +27,19 @@ ARUCO_METRIC = {
     "1": 0.084,  # odd tags in cm
     "99": 0.1 #tags from 1 to 9 and tag 931 in cm
 }
+# Adjust detection parameters to decrease the detection threshold
+arucoParams = cv2.aruco.DetectorParameters()
 
+arucoParams.adaptiveThreshWinSizeMin = 4
+arucoParams.adaptiveThreshWinSizeMax = 25
+arucoParams.adaptiveThreshWinSizeStep = 8
+arucoParams.minMarkerPerimeterRate = 0.017
+arucoParams.maxMarkerPerimeterRate = 4
+arucoParams.cornerRefinementMinAccuracy = 0.01  
 
-
+arucoParams.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+arucoParams.cornerRefinementWinSize = 5
+arucoParams.cornerRefinementMaxIterations = 10
 
 ARUCO_DICT = {
 	"DICT_4X4_50": cv2.aruco.DICT_4X4_50,
@@ -86,22 +95,8 @@ def detect_aruco(IMAGE_DIR):
             # load the ArUco dictionary, grab the ArUco parameters, and detect the markers
             print("[INFO] detecting '{}' tags...".format(aruco_type))
             arucoDict = cv2.aruco.getPredefinedDictionary(ARUCO_DICT[aruco_type])
-            arucoParams = cv2.aruco.DetectorParameters()
 
-            
-            # Adjust detection parameters to decrease the detection threshold
 
-            arucoParams.adaptiveThreshWinSizeMin = 4
-
-            arucoParams.adaptiveThreshWinSizeMax = 25
-
-            arucoParams.adaptiveThreshWinSizeStep = 8
-
-            arucoParams.minMarkerPerimeterRate = 0.017
-
-            arucoParams.maxMarkerPerimeterRate = 4
-
-            arucoParams.cornerRefinementMinAccuracy = 0.01  
 
             detector = cv2.aruco.ArucoDetector(arucoDict, arucoParams)
             corners, ids, rejected = detector.detectMarkers(image)

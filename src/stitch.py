@@ -11,7 +11,8 @@ import imutils
 
 cv2.ocl.setUseOpenCL(False)
 
-ap = argparse.ArgumentParser()
+# Parser Arguments for code dev
+#ap = argparse.ArgumentParser()
 # Remove argparse related code
 # ap = argparse.ArgumentParser()
 # ap.add_argument("-i", "--image", required=True,
@@ -21,7 +22,8 @@ ap = argparse.ArgumentParser()
 # 	help="type of ArUCo tag to detect")
 # args = vars(ap.parse_args())
 
-CONFIDENCE = 0.1
+# Stitcher confidence
+# CONFIDENCE = 0.1
 
 arucoParams = cv2.aruco.DetectorParameters()
 
@@ -29,16 +31,11 @@ arucoParams = cv2.aruco.DetectorParameters()
 # Adjust detection parameters to decrease the detection threshold
 
 
-arucoParams.cornerRefinementMinAccuracy = 0.01  
-
+arucoParams.cornerRefinementMinAccuracy = 0.01
 arucoParams.adaptiveThreshWinSizeMin = 5
-
 arucoParams.adaptiveThreshWinSizeMax = 23
-
 arucoParams.adaptiveThreshWinSizeStep = 10
-
 arucoParams.minMarkerPerimeterRate = 0.05
-
 arucoParams.maxMarkerPerimeterRate = 6.0
 
 # Add these parameters to further refine detection
@@ -77,10 +74,9 @@ ARUCO_DICT = {
 }
 
 
-def reverse(input_video_path):
-    output_video_path = "C:/Users/kklym/Documents/GitHub/vertical_distance_mapping_warehouse/new.mp4"
+def reverse(SOURCE_DIR, OUTPUT_DIR):
     # Open the video file
-    cap = cv2.VideoCapture(input_video_path)
+    cap = cv2.VideoCapture(SOURCE_DIR)
 
     # Get video properties
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -106,13 +102,13 @@ def reverse(input_video_path):
 
     # Optionally, you can write the reversed frames to a new video file
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_video_path, fourcc, fps, (frame_width, frame_height))
+    out = cv2.VideoWriter(OUTPUT_DIR, fourcc, fps, (frame_width, frame_height))
 
     for frame in reversed_frames:
         out.write(frame)
 
     out.release()
-    return output_video_path
+    return OUTPUT_DIR
 
 
 def extract_frames(video_path, output_folder, frame_rate, frames_per_pano):

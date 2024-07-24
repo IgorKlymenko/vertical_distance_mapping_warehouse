@@ -96,7 +96,7 @@ class Pole:
         self.lifetime = lifetime
 
 
-def extract_frames(SOURCE_DIR, FRAME_DIR):
+def extract_frames(SOURCE_DIR, FRAME_DIR, FRAME_RATE):
     os.makedirs(FRAME_DIR, exist_ok=True)
 
     # Process each video in the source directory
@@ -111,8 +111,8 @@ def extract_frames(SOURCE_DIR, FRAME_DIR):
         frame_id += 1
 
         # Process every 10th frame
-        if frame_id % FRAMES_PER_IMAGE == 0:
-            output_path = os.path.join(FRAME_DIR, f"frame_{frame_id//FRAMES_PER_IMAGE:04d}.jpg")
+        if frame_id % FRAME_RATE == 0:
+            output_path = os.path.join(FRAME_DIR, f"frame_{frame_id//FRAME_RATE:04d}.jpg")
             cv2.imwrite(output_path, frame)
 
     cap.release()
@@ -120,7 +120,7 @@ def extract_frames(SOURCE_DIR, FRAME_DIR):
     print(f"Frame extraction completed. Frames saved in {FRAME_DIR}.")
 
 
-def detect_poles(FRAME_DIR, OUTPUT_DIR, WEIGHTS_DIR):
+def detect_poles(FRAME_DIR, OUTPUT_DIR, WEIGHTS_DIR, POLES_CONF):
     os.makedirs(WEIGHTS_DIR, exist_ok=True)
     poles = {}
 
@@ -132,7 +132,7 @@ def detect_poles(FRAME_DIR, OUTPUT_DIR, WEIGHTS_DIR):
     print(f"Device being used: {DEVICE}")
 
     # Load YOLO model
-    YOLOmodel = YOLO(os.path.join(WEIGHTS_DIR, "yolo", "best.pt"))
+    YOLOmodel = YOLO(os.path.join(WEIGHTS_DIR, "yolo", "vert-stitch-YOLOv9.pt"))
 
     DETECTED_DIR = OUTPUT_DIR
     os.makedirs(DETECTED_DIR, exist_ok=True)
@@ -152,7 +152,7 @@ def detect_poles(FRAME_DIR, OUTPUT_DIR, WEIGHTS_DIR):
             frame = imutils.resize(frame, width = IMG_SCALE)
 
             # Object detection using YOLO
-            results = YOLOmodel(frame, imgsz = IMG_SCALE, conf=0.5)
+            results = YOLOmodel(frame, imgsz = IMG_SCALE, conf=POLES_CONF)
 
             for result in results:
                 boxes = result.boxes  # Access boxes directly from the result object
@@ -302,7 +302,10 @@ def sort_images(SOURCE_DIR, DEST_DIR, FRAMES_PER_PANO, poles):
         print(f"Found {len(next_frames)} frames for next pole")
 
         # Take last half of current pole frames and first half of next pole frames
-        panorama_frames = current_frames[-half_frames:] + next_frames[:half_frames]
+        if FRAMES_PER_PANO % 2 == 0:
+            panorama_frames = current_frames[-half_frames:] + next_frames[:half_frames]
+        else:
+            panorama_frames = current_frames[-half_frames:] + next_frames[:half_frames+1]
         print(f"Selected {len(panorama_frames)} frames for panorama")
 
         if len(panorama_frames) == FRAMES_PER_PANO:
