@@ -22,8 +22,8 @@ Custom image processing pipeline for warehouse distance mapping and object detec
 
 ## Usage
 
-Put the video for procewsing into data/raw folder in your code dir
-Run main script: `python main.py`
+- Put the video for procewsing into `data/raw` folder
+- Run main script: `python main.py`
 
 ## Structure
 
