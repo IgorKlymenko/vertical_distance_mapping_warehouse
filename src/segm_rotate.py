@@ -23,7 +23,7 @@ def rotate_yolo(BASE_DIR, IMAGE_DIR):
     # Download pretrained file for Segment Anything Model (SAM)
     if "sam_vit_h_4b8939.pth" not in os.listdir(os.path.join(WEIGHTS_DIR, "sam")):
         url = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth"
-        filename = "weights/sam_vit_h_4b8939.pth"
+        filename = os.path.join(WEIGHTS_DIR, "sam", "sam_vit_h_4b8939.pth")
         urllib.request.urlretrieve(url, filename)
         print(f"Downloaded {filename}")
 

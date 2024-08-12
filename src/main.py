@@ -13,7 +13,8 @@ IMAGE_DIR = os.path.join(BASE_DIR, "results")
 FRAME_DIR = os.path.join(IMAGE_DIR, "sorting", "raw")
 CLAS_DIR = os.path.join(IMAGE_DIR, "sorting", "detected")
 WEIGHTS_DIR = os.path.join(BASE_DIR, "weights")
-VIDEO_DIR = os.path.join(BASE_DIR, "data/raw", "sample1_short.mp4")
+VIDEO_DIR = os.path.join(BASE_DIR, "data/raw", "sample1.mp4")
+NEW_VID_DIR = os.path.join(BASE_DIR, "data/raw", "sample1_rev.mp4")
 
 
 POLES_CONF = 0.6
@@ -59,30 +60,32 @@ def plot_stats(dist):
 if __name__ == "__main__":  
      
     #video = stitch.reverse(VIDEO_DIR, VIDEO_DIR)
+    stitch.test_process_video_vertically(VIDEO_DIR, NEW_VID_DIR)
+    VIDEO_DIR = NEW_VID_DIR
     
     # Normal Image Extraction
     #stitch.extract_frames(VIDEO_DIR, IMAGE_DIR, frame_rate = 9, frames_per_pano = 6)
     
     # Image Extraction using poles detection
-    detect_poles.extract_frames(SOURCE_DIR = VIDEO_DIR, FRAME_DIR = FRAME_DIR, FRAME_RATE = FRAME_RATE)
-    poles = detect_poles.detect_poles(FRAME_DIR = FRAME_DIR, OUTPUT_DIR = CLAS_DIR, WEIGHTS_DIR = WEIGHTS_DIR, POLES_CONF = POLES_CONF)
-    detect_poles.sort_images(SOURCE_DIR= FRAME_DIR, DEST_DIR = IMAGE_DIR, FRAMES_PER_PANO = FRAMES_PER_PANO, poles=poles)
+    #detect_poles.extract_frames(SOURCE_DIR = VIDEO_DIR, FRAME_DIR = FRAME_DIR, FRAME_RATE = FRAME_RATE)
+    #poles = detect_poles.detect_poles(FRAME_DIR = FRAME_DIR, OUTPUT_DIR = CLAS_DIR, WEIGHTS_DIR = WEIGHTS_DIR, POLES_CONF = POLES_CONF)
+    #detect_poles.sort_images(SOURCE_DIR= FRAME_DIR, DEST_DIR = IMAGE_DIR, FRAMES_PER_PANO = FRAMES_PER_PANO, poles=poles)
     
     #input("Look at first folders before drone starts moving and delete those")
 
-    stitch.set_stitch(IMAGE_DIR)
-    segm_rotate.rotate_yolo(BASE_DIR=BASE_DIR, IMAGE_DIR=IMAGE_DIR)
+    #stitch.set_stitch(IMAGE_DIR)
+    #segm_rotate.rotate_yolo(BASE_DIR=BASE_DIR, IMAGE_DIR=IMAGE_DIR)
     
-    stitch.mark_aruco(SOURCE_DIR = os.path.join(IMAGE_DIR, "rotated"), IMAGE_DIR = IMAGE_DIR)
+    #stitch.mark_aruco(SOURCE_DIR = os.path.join(IMAGE_DIR, "rotated"), IMAGE_DIR = IMAGE_DIR)
     
     #input("Stitching and rotating is DONE - Proceed? [Y/n]")
 
     
      
-    aruco_markers, aruco_width = measure_aruco.detect_aruco(IMAGE_DIR=IMAGE_DIR)
-    print(aruco_markers, aruco_width)
+    #aruco_markers, aruco_width = measure_aruco.detect_aruco(IMAGE_DIR=IMAGE_DIR)
+    #print(aruco_markers, aruco_width)
     
-    dist = measure_aruco.relative_distance(aruco_markers, aruco_width, IMAGE_DIR)
+    #dist = measure_aruco.relative_distance(aruco_markers, aruco_width, IMAGE_DIR)
 
-    plot_stats(dist)
+    #plot_stats(dist)
 

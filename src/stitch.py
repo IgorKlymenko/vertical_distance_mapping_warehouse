@@ -73,6 +73,42 @@ ARUCO_DICT = {
 #	"DICT_APRILTAG_36h11": cv2.aruco.DICT_APRILTAG_36h11
 }
 
+def test_process_video_vertically(input_file, output_folder):
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    cap = cv2.VideoCapture(input_file)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    duration = frame_count / fps
+
+    segment = 0
+    frame_num = 0
+    out = None
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        if frame_num % int(20 * fps) == 0:
+            if out is not None:
+                out.release()
+            segment += 1
+            output_file = os.path.join(output_folder, f"segment_{segment}.mp4")
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(output_file, fourcc, fps, (frame.shape[0], frame.shape[1]))
+
+        rotated_frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+        out.write(rotated_frame)
+        frame_num += 1
+
+    cap.release()
+    if out is not None:
+        out.release()
+
+    print("Video processing completed.")
+
 
 def reverse(SOURCE_DIR, OUTPUT_DIR):
     # Open the video file
@@ -194,15 +230,16 @@ def img_stitch(IMAGE_DIR):
 def set_stitch(IMAGE_DIR):
     """Function that calls img_stitch on the folder with images to stitch"""
     for filename in natsorted(os.listdir(IMAGE_DIR)):
-        stitched_image = img_stitch(os.path.join(IMAGE_DIR, filename))
-        
-        if not os.path.exists(os.path.join(IMAGE_DIR, "stitched")):
-            os.makedirs(os.path.join(IMAGE_DIR, "stitched"))
+        if not filename.endswith(".DS_Store"):
+            stitched_image = img_stitch(os.path.join(IMAGE_DIR, filename))
+            
+            if not os.path.exists(os.path.join(IMAGE_DIR, "stitched")):
+                os.makedirs(os.path.join(IMAGE_DIR, "stitched"))
 
-        if stitched_image is not None:
-            cv2.imwrite(os.path.join(IMAGE_DIR, "stitched", f"{filename}.jpg"), stitched_image)
-        else:
-            print(f"Skipping {filename} due to stitching error.")
+            if stitched_image is not None:
+                cv2.imwrite(os.path.join(IMAGE_DIR, "stitched", f"{filename}.jpg"), stitched_image)
+            else:
+                print(f"Skipping {filename} due to stitching error.")
 
 def mark_aruco(SOURCE_DIR, IMAGE_DIR):
     """Detect Aruco + Measures Detects Corner and Central parts of the Aruco"""
